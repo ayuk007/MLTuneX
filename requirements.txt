@@ -1,0 +1,10 @@
+scikit-learn
+pandas
+numpy
+langchain
+openai
+langchain-openai
+langchain-community
+langchain-core
+optuna
+python-dotenv
