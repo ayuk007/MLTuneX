@@ -8,3 +8,5 @@ langchain-community
 langchain-core
 optuna
 python-dotenv
+xgboost
+lightgbm
