@@ -19,7 +19,6 @@ import pandas as pd
 from typing import Union, Tuple, Dict, Any
 from mltunex.data.ingestion import Data_Ingestion
 from mltunex.trainer.trainer import ModelTrainer
-from mltunex.hyperparam_tuner.hyperparameter_tuning_orchestration import HyperparameterTuningOrchestration
 from mltunex.ai_handler.metadata_profiler import MetaDataProfiler
 from mltunex.utils.model_utils import ModelUtils
 
@@ -95,13 +94,6 @@ class MLTuneX:
             is_preprocessed=False
         )
         
-        # Initialize tuning orchestrator
-        self.tuner = HyperparameterTuningOrchestration(
-            hyperparameter_framework=self.hyperparameter_framework,
-            models_library=self.models_library,
-            task_type = self.task_type,
-            training_results=None  # Will be set after training
-        )
     
     def run(self, result_csv_path: str, model_dir_path: str, 
             tune_models: str = "yes") -> None:
@@ -147,51 +139,57 @@ class MLTuneX:
         )
         
         # Skip tuning if not requested
-        if tune_models != "yes":
-            print("Skipping hyperparameter tuning.")
-            return
+        if tune_models == "yes":
+            from mltunex.hyperparam_tuner.hyperparameter_tuning_orchestration import HyperparameterTuningOrchestration
+            # Initialize hyperparameter tuning orchestration
+            self.tuner = HyperparameterTuningOrchestration(
+                hyperparameter_framework=self.hyperparameter_framework,
+                models_library=self.models_library,
+                task_type = self.task_type,
+                training_results=None  # Will be set after training
+            )
+
+            # Select top performing models
+            top_models = ModelUtils.get_topK_models(
+                results_csv=evaluation_df, 
+                k=3,
+                task_type = self.task_type
+            )
             
-        # Select top performing models
-        top_models = ModelUtils.get_topK_models(
-            results_csv=evaluation_df, 
-            k=3,
-            task_type = self.task_type
-        )
-        
-        # Update tuner with training results
-        self.tuner.hyperparameter_tuner.training_results = training_results
-        
-        # Run hyperparameter optimization
-        best_model, best_params = self.tuner.tune(
-            data_profile=metadata,
-            top_models=top_models.to_json(),
-            model_hyperparameter_schema=str(
-                self.trainer.model_registry.get_all_hyperparameters(
-                    top_models=top_models["Model"].tolist(),
-                    models=training_results[0]
-                )
-            ),
-            x_train=self.x_train,
-            y_train=self.y_train
-        )
-        
-        # Print optimization results
-        print(f"Best Model: {best_model}, Best Hyperparameters: {best_params}")
-        
-        # Train final model with best parameters
-        best_model_object = self.train_best_model(
-            model_name=best_model,
-            x_train=self.x_train,
-            y_train=self.y_train,
-            best_params=best_params
-        )
-        
-        # Save the optimized model
-        self.save_best_model(
-            model_name=best_model,
-            model=best_model_object,
-            model_dir_path=model_dir_path
-        )
+            # Update tuner with training results
+            self.tuner.hyperparameter_tuner.training_results = training_results
+            
+            # Run hyperparameter optimization
+            best_model, best_params = self.tuner.tune(
+                data_profile=metadata,
+                top_models=top_models.to_json(),
+                model_hyperparameter_schema=str(
+                    self.trainer.model_registry.get_all_hyperparameters(
+                        top_models=top_models["Model"].tolist(),
+                        models=training_results[0]
+                    )
+                ),
+                x_train=self.x_train,
+                y_train=self.y_train
+            )
+            
+            # Print optimization results
+            print(f"Best Model: {best_model}, Best Hyperparameters: {best_params}")
+            
+            # Train final model with best parameters
+            best_model_object = self.train_best_model(
+                model_name=best_model,
+                x_train=self.x_train,
+                y_train=self.y_train,
+                best_params=best_params
+            )
+            
+            # Save the optimized model
+            self.save_best_model(
+                model_name=best_model,
+                model=best_model_object,
+                model_dir_path=model_dir_path
+            )
 
     def train_best_model(self, model_name: str, x_train: pd.DataFrame, 
                         y_train: pd.Series, 

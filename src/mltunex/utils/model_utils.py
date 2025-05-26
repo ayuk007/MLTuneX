@@ -63,7 +63,7 @@ class ModelUtils:
         return results
 
     @staticmethod    
-    def save_results(evaluation_results: Dict[str, Dict], evaluation_results_path: str = None, save: bool = False) -> pd.DataFrame:
+    def save_results(evaluation_results: Dict[str, Dict], evaluation_results_path: str = None, save: bool = True) -> pd.DataFrame:
         rows = []
         for result in evaluation_results:
             # Assuming each item is a dictionary with model names as keys and metrics as values
