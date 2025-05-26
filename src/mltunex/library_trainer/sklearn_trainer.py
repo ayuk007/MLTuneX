@@ -11,6 +11,7 @@ Examples:
 """
 
 import pandas as pd
+from typing import Optional, Dict
 from sklearn.base import BaseEstimator
 from mltunex.library_trainer.base import BaseLibraryTrainer
 
@@ -33,7 +34,7 @@ class SklearnTrainer(BaseLibraryTrainer):
         pass
 
     def train_model(self, model: BaseEstimator, X_train: pd.DataFrame, 
-                   y_train: pd.Series, task_type: str = None) -> BaseEstimator:
+                   y_train: pd.Series, task_type: str = None, tune: bool = False, params: Dict = None) -> BaseEstimator:
         """
         Train a scikit-learn model with the given training data.
 
@@ -48,6 +49,11 @@ class SklearnTrainer(BaseLibraryTrainer):
             Training features.
         y_train : pd.Series
             Training labels.
+        tune : bool, optional
+            Whether to perform hyperparameter tuning (default is False).
+        params : Dict, optional
+            Hyperparameters to set for the model if tuning is enabled.
+            If None, default parameters will be used.
         task_type : str, optional
             Type of machine learning task ('classification' or 'regression').
 
@@ -68,14 +74,21 @@ class SklearnTrainer(BaseLibraryTrainer):
         """
         try:
             # Initialize the model instance
-            model_instance = model()
+            if tune:
+                model_instance = model.__class__()
+                model_instance.set_params(**params)
 
-            # Configure parallel processing if supported
+            else:
+                model_instance = model()
+                if params is not None:
+                    model_instance.set_params(**params)
+            # Create a pipeline with the model
             if hasattr(model_instance, "n_jobs"):
                 model_instance.set_params(n_jobs=-1)
-            
-            # Train the model with provided data
-            model_instance.fit(X_train, y_train)
+                
+            if X_train is not None and y_train is not None:
+                # If training data is provided, fit the model
+                model_instance.fit(X_train, y_train)
 
             return model_instance
         except Exception as e:

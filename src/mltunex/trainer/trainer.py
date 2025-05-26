@@ -60,16 +60,10 @@ class ModelTrainer(BaseTrainer):
         Model evaluation handler.
     """
 
-    def __init__(self, X_train: pd.DataFrame,
-                 X_test: pd.DataFrame, y_train: pd.Series, y_test: pd.Series, 
-                 models_library: str, cross_validation_strategy: str,
+    def __init__(self, models_library: str, cross_validation_strategy: str,
                  task_type: Literal["classification", "regression"], 
                  train_parallelization: bool = False):
         """Initialize ModelTrainer with data and configuration."""
-        self.X_train = X_train
-        self.X_test = X_test
-        self.y_train = y_train
-        self.y_test = y_test
         self.task_type = task_type
         
         # Initialize components
@@ -122,7 +116,7 @@ class ModelTrainer(BaseTrainer):
         model_name, estimator = model
         print("Model: ", model_name)
         # Configure task type for training
-        task_type = "classification" if self.task_type == "classifier" else "regressor"
+        task_type = self.task_type if self.task_type else ValueError("Task type must be specified for training.")
         estimator = self.library_trainer.train_model(
             model=estimator, X_train=X_train, 
             y_train=y_train, task_type=task_type
