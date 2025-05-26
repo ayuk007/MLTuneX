@@ -33,8 +33,8 @@ class SklearnTrainer(BaseLibraryTrainer):
         """Initialize the SklearnTrainer."""
         pass
 
-    def train_model(self, model: BaseEstimator, X_train: pd.DataFrame, 
-                   y_train: pd.Series, task_type: str = None, tune: bool = False, params: Dict = None) -> BaseEstimator:
+    def train_model(self, model: BaseEstimator, X_train: pd.DataFrame = None, 
+                   y_train: pd.Series = None, task_type: str = None, tune: bool = False, params: Dict = None) -> BaseEstimator:
         """
         Train a scikit-learn model with the given training data.
 

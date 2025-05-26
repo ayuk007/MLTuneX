@@ -13,7 +13,7 @@ class TestMLTuneX(unittest.TestCase):
     def test_run(self):
         self.mltunex.run(
             result_csv_path = "../test_assets/results/california_housing_results.csv",
-            model_dir_path = "../test_assets/models",
+            model_dir_path = "../test_assets/models", tune_models = "yes"
         )
 
 if __name__ == "__main__":

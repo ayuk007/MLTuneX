@@ -43,3 +43,4 @@ htmlcov/
 
 # Directories
 experiments/
+test_assets/

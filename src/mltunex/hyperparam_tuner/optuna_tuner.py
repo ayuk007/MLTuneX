@@ -16,6 +16,7 @@ import pandas as pd
 from typing import List, Dict, Any, Tuple
 from sklearn.model_selection import cross_val_score
 from mltunex.hyperparam_tuner.base import BaseHyperparameterTuner
+from mltunex.library_trainer.library_trainer import LibraryTrainer
 
 # Suppress Optuna's user warnings for cleaner output
 warnings.filterwarnings("ignore", category=UserWarning, module="optuna")
@@ -43,10 +44,11 @@ class OptunaHyperparameterTuner(BaseHyperparameterTuner):
         'r2' for regression).
     """
 
-    def __init__(self, training_results: List, task_type: str):
+    def __init__(self, training_results: List, task_type: str, library: str = "sklearn"):
         """Initialize OptunaHyperparameterTuner with configuration."""
         self.training_results = training_results
         self.task_type = task_type
+        self.model_trainer = LibraryTrainer.get_trainer(library = library)
         self.scoring_metric = "accuracy" if task_type == "classification" else "r2"
         
     def get_best_hyperparameters(self, best_params_dict: dict, 
@@ -168,19 +170,17 @@ class OptunaHyperparameterTuner(BaseHyperparameterTuner):
                 params[param_name] = self.suggest_param(trial, full_name, param_def)
 
             try:
-                # Initialize and configure model
-                model_cls = self.training_results[model_name][-1].__class__
-                model = model_cls().set_params(**params)
-
-                # Evaluate using cross-validation
-                return cross_val_score(
-                    model, x_train, y_train, 
-                    cv=3, scoring=self.scoring_metric
-                ).mean()
-
+                model_tuple = self.training_results[0][model_name]
+                model = self.model_trainer.train_model(model = model_tuple[-1], params = params, tune = True)
+                # print(model)
+                if model is None:
+                    raise ValueError(f"Model {model_name} could not be trained with the given parameters: {params}")
+                # Evaluate
+                return cross_val_score(model, x_train, y_train, cv = 3, scoring=self.scoring_metric).mean()
             except Exception as e:
-                print(f"Error evaluating {model_name} with params {params}: {e}")
-                return float("-inf")
+                print(f"Error during hyperparameter tuning for {model_name} with params {params}: {e}")
+                # Return a very low score to avoid this trial
+                return 0.0
 
         return objective
     
