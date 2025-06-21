@@ -6,7 +6,7 @@ from mltunex.ai_handler.metadata_profiler import MetaDataProfiler
 from mltunex.trainer.trainer import ModelTrainer
 from mltunex.utils.model_utils import ModelUtils
 from mltunex.model_registry.model_registry import Model_Registry
-from mltunex.ai_handler.hyperparam_generator import OpenAIHyperparamGenerator
+from mltunex.ai_handler.llm_manager.llm_manager import LLMManager
 from mltunex.hyperparam_tuner.hyperparameter_tuner import HyperparameterTunerFactory
 
 
@@ -18,9 +18,9 @@ X_train, X_test, y_train, y_test = ingestor.ingest_data(data_path, target_column
 
 
 
-trainer = ModelTrainer(X_train, X_test, y_train, y_test, models_library="sklearn", cross_validation_strategy="kfold", task_type="regression")
+trainer = ModelTrainer(models_library="sklearn", cross_validation_strategy="kfold", task_type="regression")
 results, evaluation_results = trainer._run(X_train, y_train, X_test, y_test)
-evaluation_df = ModelUtils.save_results(evaluation_results = evaluation_results)
+evaluation_df = ModelUtils.save_results(evaluation_results = evaluation_results, evaluation_results_path = "../test_assets/results/california_housing_results.csv")
 top_models = ModelUtils.get_topK_models(results_csv = evaluation_df, task_type = "regression", k = 3)
 
 
@@ -29,7 +29,7 @@ metadata = profiler.extract()
 
 model_registry = Model_Registry.get_model_registry("sklearn")
 model_hyperparameter_schema = model_registry.get_all_hyperparameters(top_models = top_models["Model"].tolist(), models = results)
-hyperparam_generator = OpenAIHyperparamGenerator()
+hyperparam_generator = LLMManager.get_llm_instance(model_provider_model_name = "Groq:qwen/qwen3-32b")
 response = hyperparam_generator.generate_response(
     data_profile = metadata,
     top_models = top_models.to_json(),

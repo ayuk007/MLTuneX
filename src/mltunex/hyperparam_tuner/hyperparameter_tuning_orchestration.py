@@ -21,7 +21,8 @@ import pandas as pd
 from typing import Union, Tuple, Dict, Any, List
 from mltunex.model_registry.model_registry import Model_Registry
 from mltunex.hyperparam_tuner.optuna_tuner import OptunaHyperparameterTuner
-from mltunex.ai_handler.hyperparam_generator import OpenAIHyperparamGenerator
+from mltunex.ai_handler.llm_manager.llm_manager import LLMManager
+
 
 
 class HyperparameterTuningOrchestration:
@@ -58,7 +59,7 @@ class HyperparameterTuningOrchestration:
 
     def __init__(self, task_type: str, hyperparameter_framework: str = "Optuna", 
                  models_library: str = "sklearn", 
-                 training_results: List = None):
+                 training_results: List = None, model_provider_model_name: str = "Groq:qwen/qwen3-32b") -> None:
         """Initialize the hyperparameter tuning orchestration."""
         self.hyperparameter_framework = hyperparameter_framework
         self.models_library = models_library
@@ -68,9 +69,7 @@ class HyperparameterTuningOrchestration:
         self.model_registry = Model_Registry.get_model_registry(
             models_library=models_library
         )
-        self.llm_chain = OpenAIHyperparamGenerator(
-            hyperparameter_framework=hyperparameter_framework
-        )
+        self.llm_chain = LLMManager.get_llm_instance(model_provider_model_name=model_provider_model_name)
         
         # Initialize appropriate tuner based on framework
         self.hyperparameter_tuner = (

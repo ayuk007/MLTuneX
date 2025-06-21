@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
-from mltunex.config.config import OpenAIConfig
+from mltunex.config.llm_config import OpenAIConfig
 from mltunex.ai_handler.prompt import HyperparameterResponsePrompt
 
 # Load environment variables for OpenAI configuration
@@ -72,7 +72,7 @@ class OpenAIHyperparamGenerator:
         self.hyperparameter_framework = hyperparameter_framework
         
         # Initialize LangChain components
-        self.llm = ChatOpenAI(model_name=config.model, temperature=config.temperature)
+        self.llm = ChatOpenAI(model=config.model, temperature=config.temperature)
         self.output_parser = JsonOutputParser()
         
         # Create prompt template with required variables
