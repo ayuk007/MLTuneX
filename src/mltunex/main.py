@@ -66,7 +66,7 @@ class MLTuneX:
     """
 
     def __init__(self, data: Union[Tuple, str, pd.DataFrame], target_column: str, 
-                 task_type: str, hyperparameter_framework: str = "Optuna", 
+                 task_type: str, model_provider_model_name: str, hyperparameter_framework: str = "Optuna", 
                  models_library: str = "sklearn"):
         """Initialize MLTuneX with data and configuration."""
         # Store configuration
@@ -100,7 +100,9 @@ class MLTuneX:
             hyperparameter_framework=self.hyperparameter_framework,
             models_library=self.models_library,
             task_type = self.task_type,
-            training_results=None  # Will be set after training
+            training_results=None,  # Will be set after training
+            model_provider_model_name = model_provider_model_name
+
         )
     
     def run(self, result_csv_path: str, model_dir_path: str, 

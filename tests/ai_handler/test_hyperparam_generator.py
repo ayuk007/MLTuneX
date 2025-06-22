@@ -6,7 +6,7 @@ from mltunex.ai_handler.metadata_profiler import MetaDataProfiler
 from mltunex.trainer.trainer import ModelTrainer
 from mltunex.utils.model_utils import ModelUtils
 from mltunex.model_registry.model_registry import Model_Registry
-from mltunex.ai_handler.hyperparam_generator import OpenAIHyperparamGenerator
+from mltunex.ai_handler.llm_manager.openai_handler import OpenAIHyperparamGenerator
 
 
 

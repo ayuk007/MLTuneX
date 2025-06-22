@@ -165,11 +165,11 @@ class OptunaHyperparameterTuner(BaseHyperparameterTuner):
 
             # Suggest hyperparameters for the model
             params = {}
-            for param_name, param_def in param_defs.items():
-                full_name = f"{model_name}_{param_name}"
-                params[param_name] = self.suggest_param(trial, full_name, param_def)
-
             try:
+                for param_name, param_def in param_defs.items():
+                    full_name = f"{model_name}_{param_name}"
+                    params[param_name] = self.suggest_param(trial, full_name, param_def)
+        
                 model_tuple = self.training_results[0][model_name]
                 model = self.model_trainer.train_model(model = model_tuple[-1], params = params, tune = True)
                 # print(model)
@@ -178,7 +178,7 @@ class OptunaHyperparameterTuner(BaseHyperparameterTuner):
                 # Evaluate
                 return cross_val_score(model, x_train, y_train, cv = 3, scoring=self.scoring_metric).mean()
             except Exception as e:
-                print(f"Error during hyperparameter tuning for {model_name} with params {params}: {e}")
+                print(f"Error during hyperparameter tuning for {model_name} with params {params}.")
                 # Return a very low score to avoid this trial
                 return 0.0
 
