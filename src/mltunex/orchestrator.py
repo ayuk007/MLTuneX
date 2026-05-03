@@ -283,6 +283,10 @@ class MLTuneXOrchestrator:
             print("[4/8] Preprocessing skipped (preprocess=False).")
             pl.info("Preprocessing skipped")
 
+        # Save the fitted pipeline for inference reuse
+        if cfg.preprocess:
+            self._save_pipeline()
+
         # Log preprocessing artefact
         pipeline_steps = self._pipeline.steps if self._pipeline else []
         self._logger.log_preprocessing(
@@ -334,13 +338,30 @@ class MLTuneXOrchestrator:
             self._emit("selection_done", {"top_models": top_models_df})
 
             # Save each top model to disk
+            saved_paths = []
             for _, row in top_models_df.iterrows():
                 model_name = row["Model"]
                 if model_name in trained_dict:
                     _, model_obj = trained_dict[model_name]
                     self._save_model(model_name, model_obj)
+                    saved_paths.append(
+                        os.path.abspath(
+                            os.path.join(cfg.model_dir_path, f"{model_name}.joblib")
+                        )
+                    )
                     pl.info(f"Saved model: {model_name}")
 
+            print("\n[MLTuneX] ---- Saved Models ----")
+            for p in saved_paths:
+                print(f"  {p}")
+            print("[MLTuneX] -------------------------\n")
+            self._emit("run_summary", {
+                "saved_models": saved_paths,
+                "pipeline_path": os.path.abspath(
+                    os.path.join(cfg.model_dir_path, "preprocessing_pipeline.joblib")
+                ) if cfg.preprocess else None,
+                "log_dir": self._logger.experiment_dir,
+            })
             print("[8/8] Done.\n")
             pl.info("Pipeline completed (no tuning)")
             return
@@ -391,8 +412,31 @@ class MLTuneXOrchestrator:
 
         print("Saving final model ...")
         self._save_model(best_model_name, final_model)
-        print(f"\n[MLTuneX] Experiment artefacts -> {self._logger.experiment_dir}\n")
+        final_model_path = os.path.abspath(
+            os.path.join(cfg.model_dir_path, f"{best_model_name}.joblib")
+        )
+        pipeline_path = os.path.abspath(
+            os.path.join(cfg.model_dir_path, "preprocessing_pipeline.joblib")
+        ) if cfg.preprocess else None
+
+        print("\n[MLTuneX] ========== Run Summary ==========")
+        print(f"  Best model   : {best_model_name}")
+        print(f"  Best score   : {getattr(optimizer, 'best_score', 0.0):.5f}")
+        print(f"  Model saved  : {final_model_path}")
+        if pipeline_path and os.path.exists(pipeline_path):
+            print(f"  Pipeline     : {pipeline_path}")
+        print(f"  Logs & reports: {self._logger.experiment_dir}")
+        print("[MLTuneX] ====================================\n")
+
+        self._emit("run_summary", {
+            "best_model":     best_model_name,
+            "best_score":     getattr(optimizer, "best_score", 0.0),
+            "saved_models":   [final_model_path],
+            "pipeline_path":  pipeline_path,
+            "log_dir":        self._logger.experiment_dir,
+        })
         pl.info("Pipeline completed successfully",
+                model=best_model_name, path=final_model_path,
                 artefacts=self._logger.experiment_dir)
         print("Done.\n")
 
@@ -617,8 +661,35 @@ class MLTuneXOrchestrator:
             )
 
     def _save_model(self, model_name: str, model: Any) -> None:
-        path = os.path.join(self._cfg.model_dir_path, f"{model_name}.joblib")
-        ModelUtils.save_model(model, path)
+        os.makedirs(self._cfg.model_dir_path, exist_ok=True)
+        save_path = os.path.abspath(
+            os.path.join(self._cfg.model_dir_path, f"{model_name}.joblib")
+        )
+        ModelUtils.save_model(model, save_path)
+        # Always show the user where the model landed — CLI, import, Streamlit
+        print(f"[MLTuneX] Model saved  : {save_path}")
+        if self._plog:
+            self._plog.info(f"Model saved", model=model_name, path=save_path)
+        self._emit("model_saved", {"model": model_name, "path": save_path})
+
+    def _save_pipeline(self) -> None:
+        """Persist the fitted preprocessing pipeline so it can be reused at inference time."""
+        if self._pipeline is None:
+            return
+        os.makedirs(self._cfg.model_dir_path, exist_ok=True)
+        save_path = os.path.abspath(
+            os.path.join(self._cfg.model_dir_path, "preprocessing_pipeline.joblib")
+        )
+        try:
+            import joblib
+            joblib.dump(self._pipeline, save_path)
+            print(f"[MLTuneX] Pipeline saved: {save_path}")
+            if self._plog:
+                self._plog.info("Preprocessing pipeline saved", path=save_path)
+            self._emit("pipeline_saved", {"path": save_path})
+        except Exception as exc:
+            if self._plog:
+                self._plog.error("Failed to save preprocessing pipeline", exc=exc)
 
     @staticmethod
     def _profile_to_xml(profile: Dict[str, Any]) -> str:
