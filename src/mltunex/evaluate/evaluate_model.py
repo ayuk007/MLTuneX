@@ -101,5 +101,5 @@ class EvaluateModel(BaseEvaluator):
 
         except Exception as e:
             # Log error and return None for failed evaluation
-            print(f"Error evaluating model {model_name}: {e}")
+            # print(f"Error evaluating model {model_name}: {e}")
             return {model_name: None}
