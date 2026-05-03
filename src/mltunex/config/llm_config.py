@@ -4,7 +4,7 @@ from typing import Literal
 
 @dataclass
 class OpenAIConfig:
-    model: Literal["gpt-4o"]
+    model: Literal["gpt-4o"] #type: ignore
     temperature: float = 0
     SYSTEM_PROMPT: str = LLMPrompts.OpenAIPrompt
 
@@ -49,10 +49,10 @@ class LLMConfig:
         llm_type, model_name = model_provider_model_name.split(":")
 
         if llm_type.lower() == "openai":
-            llm = OpenAIConfig(model=model_name)
+            llm = OpenAIConfig(model = model_name)
             return llm
         elif llm_type.lower() == "groq":
-            llm = GroqConfig(model=model_name)
+            llm = GroqConfig(model = model_name)
             return llm
         else:
             raise ValueError(f"Unsupported LLM type: {llm_type}")
