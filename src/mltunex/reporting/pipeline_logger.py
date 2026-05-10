@@ -92,7 +92,7 @@ class PipelineLogger:
             lg.setLevel(logging.CRITICAL)   # file still gets it via our handler
             lg.propagate = False
 
-        self.info(f"Pipeline logger initialised — {self._log_path}")
+        self.info(f"Pipeline logger initialised: {self._log_path}")
 
     # ── Public API ────────────────────────────────────────────────────
 
@@ -122,15 +122,15 @@ class PipelineLogger:
         >>> with logger.stage("Training"):
         ...     train_all_models()
         """
-        self.info(f">> STAGE START [{name}]")
+        self.info(f"[START] {name}")
         t0 = time.perf_counter()
         try:
             yield
             elapsed = time.perf_counter() - t0
-            self.info(f"   STAGE END   [{name}] ({elapsed:.2f}s)")
+            self.info(f"[END]   {name} ({elapsed:.2f}s)")
         except Exception as exc:
             elapsed = time.perf_counter() - t0
-            self.error(f"!! STAGE FAILED [{name}] ({elapsed:.2f}s)", exc=exc)
+            self.error(f"[FAIL]  {name} ({elapsed:.2f}s)", exc=exc)
             raise
 
     def log_dict(self, label: str, data: dict, max_items: int = 50) -> None:
