@@ -25,7 +25,7 @@ class BaseLibraryTrainer(ABC):
     """
 
     @abstractmethod
-    def train_model(self, model: Any, X_train: Any, y_train: Any) -> Any:
+    def train_model(self, model: Any, X_train: Any, y_train: Any, task_type: Any) -> Any:
         """
         Train a model with the given training data.
 
