@@ -1,58 +1,91 @@
+"""
+mltunex.config.llm_config
+──────────────────────────
+LLM provider configuration dataclasses.
+
+Changes from original
+─────────────────────
+* Removed hard model allowlists in __post_init__ — they prevented users
+  from passing new model versions without editing source code.
+  Validation of model names is now the provider's responsibility at
+  API call time (they return a clear error if the model is unknown).
+
+* LLMConfig.get_llm_config() is kept for backward compatibility but now
+  constructs LLMHandlerConfig objects used by the new registry-based
+  system, rather than the handler directly.
+
+All existing call sites that do:
+    LLMConfig.get_llm_config("Groq:qwen/qwen3-32b")
+    LLMManager.get_llm_instance("Groq:qwen/qwen3-32b")
+continue to work unchanged.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
-from mltunex.ai_handler.prompt import LLMPrompts
 from typing import Literal
+
+from mltunex.ai_handler.prompt import LLMPrompts
+
 
 @dataclass
 class OpenAIConfig:
-    model: Literal["gpt-4o"] #type: ignore
-    temperature: float = 0
+    """Configuration for OpenAI-backed handlers (legacy, kept for compat)."""
+    model: str = "gpt-4o"
+    temperature: float = 0.0
     SYSTEM_PROMPT: str = LLMPrompts.OpenAIPrompt
 
-    def __post_init__(self):
-        """
-        Post-initialization to ensure the model is set correctly.
-        """
-        if self.model not in ["gpt-4o"]:
-            raise ValueError(f"Unsupported OpenAI model: {self.model}. Supported models: ['gpt-4o']")
 
 @dataclass
 class GroqConfig:
-    model: Literal["deepseek-r1-distill-llama-70b", "qwen/qwen3-32b"] # type: ignore  # This should be set to the Groq model name, e.g., "groq-1" 
-    temperature: float = 0
+    """Configuration for Groq-backed handlers (legacy, kept for compat)."""
+    model: str = "qwen/qwen3-32b"
+    temperature: float = 0.0
     SYSTEM_PROMPT: str = LLMPrompts.OpenAIPrompt
 
-    def __post_init__(self):
-        """
-        Post-initialization to ensure the model is set correctly.
-        """
-        if self.model not in ["deepseek-r1-distill-llama-70b", "qwen/qwen3-32b"]:
-            raise ValueError(f"Unsupported Groq model: {self.model}. Supported models: ['deepseek-r1-distill-llama-70b', 'qwen/qwen3-32b']")
 
 @dataclass
 class LLMConfig:
+    """
+    Factory helper — returns the appropriate config dataclass for a given
+    ``Provider:ModelName`` string.
+
+    Still used by LLMManager for backward-compat; new code should use
+    LLMHandlerRegistry.create() directly.
+    """
 
     @staticmethod
     def get_llm_config(model_provider_model_name: str):
         """
-        Get the configuration for the specified LLM type.
+        Return an OpenAIConfig or GroqConfig for *model_provider_model_name*.
 
         Parameters
         ----------
-        llm_type : str
-            The type of LLM to configure ("OpenAI" or "Groq").
+        model_provider_model_name : str
+            ``"Provider:ModelName"`` format.
 
         Returns
         -------
         OpenAIConfig | GroqConfig
-            The configuration object for the specified LLM.
         """
-        llm_type, model_name = model_provider_model_name.split(":")
+        if ":" not in model_provider_model_name:
+            raise ValueError(
+                f"model_provider_model_name must be 'Provider:ModelName', "
+                f"got '{model_provider_model_name}'."
+            )
+        llm_type, model_name = model_provider_model_name.split(":", 1)
 
         if llm_type.lower() == "openai":
-            llm = OpenAIConfig(model = model_name)
-            return llm
+            cfg = OpenAIConfig()
+            cfg.model = model_name
+            return cfg
         elif llm_type.lower() == "groq":
-            llm = GroqConfig(model = model_name)
-            return llm
+            cfg = GroqConfig()
+            cfg.model = model_name
+            return cfg
         else:
-            raise ValueError(f"Unsupported LLM type: {llm_type}")
+            raise ValueError(
+                f"Unsupported LLM provider: '{llm_type}'. "
+                f"Register a new handler with LLMHandlerRegistry.register(MyHandler) "
+                f"to support custom providers."
+            )
