@@ -1,30 +1,36 @@
-from mltunex.ai_handler.llm_manager.openai_handler import OpenAIHyperparamGenerator
+"""Central factory for LLM handler instances."""
+from __future__ import annotations
+from mltunex.ai_handler.llm_handler_base import BaseLLMHandler, LLMHandlerConfig, LLMHandlerRegistry
+from mltunex.ai_handler.prompt import LLMPrompts
 from mltunex.ai_handler.llm_manager.groq_handler import GroqHyperparamGenerator
-from mltunex.config.llm_config import OpenAIConfig, GroqConfig, LLMConfig
-from typing import Optional
+from mltunex.ai_handler.llm_manager.openai_handler import OpenAIHyperparamGenerator
+
+LLMHandlerRegistry.register(GroqHyperparamGenerator)
+LLMHandlerRegistry.register(OpenAIHyperparamGenerator)
+
 
 class LLMManager:
-
     @staticmethod
-    def get_llm_instance(model_provider_model_name: str):
-        """
-        Get the LLM instance based on the specified type and model name.
-
-        Parameters
-        ----------
-        llm_type_model_name : str
-            The type and model name of the LLM, formatted as "LLMType:ModelName".
-
-        Returns
-        -------
-        OpenAIHyperparamGenerator | GroqHyperparamGenerator
-            An instance of the specified LLM.
-        """
-        llm_config = LLMConfig.get_llm_config(model_provider_model_name)
-        
-        if isinstance(llm_config, OpenAIConfig):
-            return OpenAIHyperparamGenerator(config=llm_config)
-        elif isinstance(llm_config, GroqConfig):
-            return GroqHyperparamGenerator(config=llm_config)
-        else:
-            raise ValueError(f"Unsupported LLM configuration: {llm_config}")
+    def get_llm_instance(
+        model_provider_model_name: str,
+        framework: str = "Optuna",
+    ) -> BaseLLMHandler:
+        if ":" not in model_provider_model_name:
+            raise ValueError(
+                f"model_provider_model_name must be 'Provider:ModelName', "
+                f"got '{model_provider_model_name}'."
+            )
+        provider, model_name = model_provider_model_name.split(":", 1)
+        config = LLMHandlerConfig(
+            model_name=model_name,
+            temperature=0.0,
+            system_prompt=LLMPrompts.OpenAIPrompt,
+            framework=framework,
+        )
+        key = provider.lower()
+        if key not in LLMHandlerRegistry._registry:
+            raise ValueError(
+                f"No LLM handler registered for provider '{provider}'. "
+                f"Registered: {LLMHandlerRegistry.list_providers()}."
+            )
+        return LLMHandlerRegistry._registry[key](config=config)
