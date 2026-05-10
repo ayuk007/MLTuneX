@@ -145,7 +145,7 @@ class OrchestratorConfig:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _train_single_model_worker(
-    args: Tuple[str, Any, Any, Any, Any, str],
+    args: Tuple[str, Any, Any, Any, Any, Any, str],
 ) -> Tuple[str, Any, Dict[str, float], float, str]:
     """
     Train + evaluate one model in an isolated worker process.
@@ -230,6 +230,12 @@ class MLTuneXOrchestrator:
             base_log_dir=cfg.log_dir,
             experiment_name=cfg.experiment_name,
         )
+        # Override model save dir to be inside the experiment folder
+        # so every artefact for a run lives together.
+        self._model_dir = os.path.join(
+            self._logger.experiment_dir, "models"
+        )
+        os.makedirs(self._model_dir, exist_ok=True)
         self._plog = PipelineLogger(
             log_dir=self._logger.experiment_dir,
             experiment_name=cfg.experiment_name,
@@ -358,7 +364,7 @@ class MLTuneXOrchestrator:
             self._emit("run_summary", {
                 "saved_models": saved_paths,
                 "pipeline_path": os.path.abspath(
-                    os.path.join(cfg.model_dir_path, "preprocessing_pipeline.joblib")
+                    os.path.join(getattr(self,"_model_dir",cfg.model_dir_path), "preprocessing_pipeline.joblib")
                 ) if cfg.preprocess else None,
                 "log_dir": self._logger.experiment_dir,
             })
@@ -398,6 +404,7 @@ class MLTuneXOrchestrator:
             best_score=getattr(optimizer, "best_score", 0.0),
             n_trials=cfg.n_trials,
             optimizer_method=cfg.optimizer_method,
+            token_usage=getattr(optimizer, "_advisor_token_usage", None),
         )
         self._emit("tuning_done", {
             "best_model": best_model_name,
@@ -413,7 +420,7 @@ class MLTuneXOrchestrator:
         print("Saving final model ...")
         self._save_model(best_model_name, final_model)
         final_model_path = os.path.abspath(
-            os.path.join(cfg.model_dir_path, f"{best_model_name}.joblib")
+            os.path.join(getattr(self,"_model_dir",cfg.model_dir_path), f"{best_model_name}.joblib")
         )
         pipeline_path = os.path.abspath(
             os.path.join(cfg.model_dir_path, "preprocessing_pipeline.joblib")
@@ -616,6 +623,13 @@ class MLTuneXOrchestrator:
             top_models=top_models_df.to_json(),
             model_hyperparameter_schema=schema,
         )
+        # Extract token_usage from the underlying LLM handler.
+        # LLMAdvisorAdapter wraps the handler in self._llm; BaseLLMHandler
+        # stores token_usage directly. Also handles direct BaseLLMHandler.
+        _advisor_token_usage = (
+            getattr(advisor, "token_usage", None) or
+            getattr(getattr(advisor, "_llm", None), "token_usage", None)
+        )
 
         # Bug fix: guard against empty search spaces from LLM
         if not model_search_spaces:
@@ -632,7 +646,8 @@ class MLTuneXOrchestrator:
             task_type=cfg.task_type,
             n_trials=cfg.n_trials,
         )
-        optimizer._last_search_spaces = model_search_spaces
+        optimizer._last_search_spaces    = model_search_spaces
+        optimizer._advisor_token_usage   = _advisor_token_usage
 
         if self._plog:
             self._plog.info(f"Running Optuna: {cfg.n_trials} trials")
@@ -661,9 +676,10 @@ class MLTuneXOrchestrator:
             )
 
     def _save_model(self, model_name: str, model: Any) -> None:
-        os.makedirs(self._cfg.model_dir_path, exist_ok=True)
+        _dir = getattr(self, "_model_dir", self._cfg.model_dir_path)
+        os.makedirs(_dir, exist_ok=True)
         save_path = os.path.abspath(
-            os.path.join(self._cfg.model_dir_path, f"{model_name}.joblib")
+            os.path.join(_dir, f"{model_name}.joblib")
         )
         ModelUtils.save_model(model, save_path)
         # Always show the user where the model landed — CLI, import, Streamlit
@@ -676,9 +692,10 @@ class MLTuneXOrchestrator:
         """Persist the fitted preprocessing pipeline so it can be reused at inference time."""
         if self._pipeline is None:
             return
-        os.makedirs(self._cfg.model_dir_path, exist_ok=True)
+        _dir = getattr(self, "_model_dir", self._cfg.model_dir_path)
+        os.makedirs(_dir, exist_ok=True)
         save_path = os.path.abspath(
-            os.path.join(self._cfg.model_dir_path, "preprocessing_pipeline.joblib")
+            os.path.join(_dir, "preprocessing_pipeline.joblib")
         )
         try:
             import joblib
