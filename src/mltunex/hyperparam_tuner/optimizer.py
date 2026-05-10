@@ -100,7 +100,7 @@ class LLMAdvisorAdapter(AIAdvisor):
         response = self._llm.generate_response(
             data_profile=data_profile,
             top_models=top_models,
-            model_hyperparameter_schema=model_hyperparameter_schema,
+            schema=model_hyperparameter_schema,
         )
         # The LLM chain already returns a parsed list; validate shape.
         if not isinstance(response, list):
