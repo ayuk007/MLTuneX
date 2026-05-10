@@ -276,7 +276,6 @@ tabs = st.tabs([
 # ─────────────────────────────────────────────────────────────────────────────
 # Background thread
 # ─────────────────────────────────────────────────────────────────────────────
-
 def _run_thread(cfg: dict, queue: Queue, tmp: str, key: str, prov: str) -> None:
     _null = open(os.devnull, "w", encoding="utf-8")
     _so, _se = sys.stdout, sys.stderr
@@ -316,7 +315,6 @@ def _run_thread(cfg: dict, queue: Queue, tmp: str, key: str, prov: str) -> None:
         sys.stdout = _so; sys.stderr = _se
         try: _null.close()
         except Exception: pass
-
 
 
 # ═══ TAB 0 — Configure ════════════════════════════════════════════════════════
@@ -486,7 +484,6 @@ with tabs[0]:
     elif st.session_state.finished:
         st.success("✓ Pipeline completed. Switch to the **Run** tab for results.")
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Queue drain
 # ─────────────────────────────────────────────────────────────────────────────
@@ -620,7 +617,7 @@ with tabs[1]:
              "Time (s)": round(r.get("elapsed",0),2)}
             for r in st.session_state.model_rows
         ]
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
     if st.session_state.finished and st.session_state.best_model:
         st.markdown('<div class="sec-head">Final Result</div>', unsafe_allow_html=True)
@@ -683,7 +680,7 @@ with tabs[2]:
                 {"Column":k,"Count":v,"Pct (%)":pct.get(k,0),
                  "Severity":"High" if pct.get(k,0)>30 else("Medium" if pct.get(k,0)>5 else "Low")}
                 for k,v in missing.items()
-            ]), use_container_width=True, hide_index=True)
+            ]), width='stretch', hide_index=True)
         else:
             st.success("No missing values detected.")
         if "skewness" in profile:
@@ -714,7 +711,7 @@ with tabs[3]:
             s2.metric(f"Best {primary}",  f"{best[primary]:.4f}" if primary else "—")
             s3.metric("Models Evaluated", len(df_show))
         st.markdown('<div class="sec-head">Full Leaderboard</div>', unsafe_allow_html=True)
-        st.dataframe(df_show, use_container_width=True, hide_index=True)
+        st.dataframe(df_show, width='stretch', hide_index=True)
         if primary and "Model" in df_show.columns:
             st.markdown(f'<div class="sec-head">{primary} Comparison</div>', unsafe_allow_html=True)
             st.bar_chart(df_show[["Model",primary]].set_index("Model"))
@@ -738,7 +735,7 @@ with tabs[4]:
         )
         verb = "selected for hyperparameter tuning" if tune_models else "saved as final models"
         st.success(f"**{len(top_df)}** model(s) {verb}.")
-        st.dataframe(top_df, use_container_width=True, hide_index=True)
+        st.dataframe(top_df, width='stretch', hide_index=True)
 
 # ═══ TAB 5 — Tuning ═══════════════════════════════════════════════════════════
 with tabs[5]:
@@ -755,11 +752,12 @@ with tabs[5]:
         with tc1:
             st.markdown('<div class="sec-head">Optimal Parameters</div>', unsafe_allow_html=True)
             if st.session_state.best_params:
-                st.dataframe(
-                    pd.DataFrame(list(st.session_state.best_params.items()),
-                                 columns=["Parameter","Value"]),
-                    use_container_width=True, hide_index=True,
+                _p_df = pd.DataFrame(
+                    list(st.session_state.best_params.items()),
+                    columns=["Parameter","Value"],
                 )
+                _p_df["Value"] = _p_df["Value"].astype(str)
+                st.dataframe(_p_df, width='stretch', hide_index=True)
         with tc2:
             if st.session_state.trial_history:
                 st.markdown('<div class="sec-head">Score Progression</div>', unsafe_allow_html=True)
@@ -770,11 +768,14 @@ with tabs[5]:
         if st.session_state.trial_history:
             st.markdown('<div class="sec-head">Trial History</div>', unsafe_allow_html=True)
             th = sorted(st.session_state.trial_history, key=lambda x: x.get("score",0), reverse=True)
-            st.dataframe(pd.DataFrame([{
-                "Rank": i, "Trial": t["trial"], "Model": t.get("model","?"),
-                "Score": round(t.get("score",0),5),
-                "Params": json.dumps(t.get("params",{}), default=str),
-            } for i,t in enumerate(th,1)]), use_container_width=True, hide_index=True)
+            _th_rows = [{
+                "Rank":   int(i),
+                "Trial":  int(t.get("trial", 0)),
+                "Model":  str(t.get("model","?")),
+                "Score":  round(float(t.get("score",0)), 5),
+                "Params": str(json.dumps(t.get("params",{}), default=str)),
+            } for i,t in enumerate(th,1)]
+            st.dataframe(pd.DataFrame(_th_rows), width='stretch', hide_index=True)
 
 # ═══ TAB 6 — Reports ══════════════════════════════════════════════════════════
 with tabs[6]:
@@ -819,10 +820,10 @@ with tabs[6]:
                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     try:
                         st.dataframe(pd.read_excel(xlsx, sheet_name="Ranked"),
-                                     use_container_width=True, hide_index=True)
+                                     width='stretch', hide_index=True)
                     except Exception: pass
                 elif os.path.exists(csv):
-                    st.dataframe(pd.read_csv(csv), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.read_csv(csv), width='stretch', hide_index=True)
                 else:
                     st.info("Not yet generated.")
             with r_tabs[2]: _md(os.path.join(exp_path,"selection_report.md"))
