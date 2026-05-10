@@ -98,12 +98,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     req.add_argument(
         "--llm",
-        required=True,
+        required=False,
+        default=None,
         metavar="PROVIDER:MODEL",
         help=(
             "LLM for AI-guided hyperparameter advice. "
             "Format: Provider:ModelName  (e.g. 'Groq:qwen/qwen3-32b', "
-            "'OpenAI:gpt-4o')."
+            "'OpenAI:gpt-4o'). "
+            "Required unless --no-tune is set."
         ),
     )
 
@@ -224,11 +226,18 @@ def _validate(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None
     if args.top_k < 1:
         parser.error(f"--top-k must be ≥ 1, got {args.top_k}.")
 
-    if ":" not in args.llm:
-        parser.error(
-            f"--llm must be in 'Provider:ModelName' format, got '{args.llm}'.\n"
-            f"  Examples: 'Groq:qwen/qwen3-32b'  or  'OpenAI:gpt-4o'"
-        )
+    if not args.no_tune:
+        if not args.llm:
+            parser.error(
+                "--llm is required when AI tuning is enabled.\n"
+                "  Provide: --llm 'Groq:qwen/qwen3-32b'\n"
+                "  Or skip tuning with: --no-tune"
+            )
+        if ":" not in args.llm:
+            parser.error(
+                f"--llm must be in 'Provider:ModelName' format, got '{args.llm}'.\n"
+                f"  Examples: 'Groq:qwen/qwen3-32b'  or  'OpenAI:gpt-4o'"
+            )
 
     if args.selector == "generalization" and not args.train_metric:
         parser.error(
@@ -274,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
             source                    = args.data,
             target_column             = args.target,
             task_type                 = args.task,
-            model_provider_model_name = args.llm,
+            model_provider_model_name = args.llm or "Groq:none",
 
             result_csv_path           = args.results,
             model_dir_path            = args.models,
