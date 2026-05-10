@@ -391,12 +391,36 @@ class ExperimentLogger:
         best_score: float,
         n_trials: int,
         optimizer_method: str,
+        token_usage: Optional[Any] = None,
     ) -> None:
         lines = _doc(
             "Hyperparameter Tuning Report",
             f"Optimizer: **{optimizer_method}** &nbsp;·&nbsp; Trials: **{n_trials}**",
             self._ts_human, self._name,
         )
+
+        # ── AI token usage ────────────────────────────────────────────
+        if token_usage is not None:
+            fallback_note = (
+                "  \n> **Fallback used:** predefined search spaces were applied "
+                "because the LLM did not return a valid response after all retries."
+                if getattr(token_usage, "fallback_used", False) else ""
+            )
+            lines += [
+                "## AI Advisor — Usage Summary", "",
+                "| Property | Value |",
+                "|:---|:---|",
+                f"| Provider          | `{getattr(token_usage, 'provider',          '—')}` |",
+                f"| Model             | `{getattr(token_usage, 'model_name',        '—')}` |",
+                f"| LLM calls         | `{getattr(token_usage, 'calls',             0)}` |",
+                f"| Prompt tokens     | `{getattr(token_usage, 'prompt_tokens',     0):,}` |",
+                f"| Completion tokens | `{getattr(token_usage, 'completion_tokens', 0):,}` |",
+                f"| **Total tokens**  | **`{getattr(token_usage, 'total_tokens',   0):,}`** |",
+                f"| Fallback used     | `{getattr(token_usage, 'fallback_used', False)}` |",
+            ]
+            if fallback_note:
+                lines.append(fallback_note)
+            lines += ["", "---", ""]
 
         # ── AI search spaces ─────────────────────────────────────────
         lines += ["## AI-Suggested Search Spaces", "",
