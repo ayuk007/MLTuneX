@@ -7,7 +7,7 @@ setup(
     name="MLTuneX",
     version="0.2.0",
     author="Ayush Nashine",
-    author_email="ayush.nashine@gmail.com",
+    author_email="ayush.nashine4807@gmail.com",
     description="Automated Machine Learning Fine-Tuning System.",
     long_description=long_description,
     long_description_content_type="text/markdown",
