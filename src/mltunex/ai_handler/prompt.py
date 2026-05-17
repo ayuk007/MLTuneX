@@ -1,108 +1,103 @@
 """
-Prompt templates module for MLTuneX's AI components.
+mltunex.ai_handler.prompt
+──────────────────────────
+Prompt templates for MLTuneX AI components.
 
-This module provides structured prompt templates for different hyperparameter
-optimization frameworks and LLM interactions. It ensures consistent prompt
-formatting and response structures across the framework.
+Changes from original
+─────────────────────
+* HyperparameterResponsePrompt.get_hyperparameter_response_prompt() now
+  delegates to ResponseSchemaRegistry so the format instructions are
+  driven by the registered schema for the framework, not hard-coded here.
+  The OptunaPrompt class attribute is kept for backward compatibility but
+  is no longer the authoritative source — ResponseSchemaRegistry is.
 
-Examples:
-    >>> prompt = HyperparameterResponsePrompt.get_hyperparameter_response_prompt("Optuna")
-    >>> system_prompt = LLMPrompts.OpenAIPrompt
+* All original placeholders are preserved:
+  {Data_Profile}, {Top_Models}, {ModelHyperparameter_Schema},
+  {HyperparameterResponsePrompt}
+
+* The system prompt body is tightened — removed emoji arrows that break
+  Windows cp1252 terminals, kept all semantic instructions unchanged.
 """
 
+from __future__ import annotations
 from dataclasses import dataclass
 
 
 @dataclass
 class HyperparameterResponsePrompt:
     """
-    Collection of response format prompts for different optimization frameworks.
+    Collection of response-format prompts for different optimisation frameworks.
 
-    This class provides template strings that specify the expected response
-    format for different hyperparameter optimization frameworks. Currently
-    supports Optuna with extensibility for other frameworks.
+    ``get_hyperparameter_response_prompt`` is the canonical way to obtain the
+    format instructions.  It delegates to ResponseSchemaRegistry so any
+    registered framework is automatically supported.
 
-    Attributes
-    ----------
-    OptunaPrompt : str
-        Template string for Optuna-compatible hyperparameter suggestions.
+    The ``OptunaPrompt`` class attribute is retained as a fallback for code
+    that accesses it directly.
     """
 
+    # Kept for direct-access backward compatibility
     OptunaPrompt: str = """
-    - Use this format for each model:
-    - Return a list of dictionaries, one per model, with hyperparameters structured for use with Optuna:
+    - Return a JSON array, one object per model, structured for Optuna.
+    - Each object must have "model_name" (string) and
+      "suggested_hyperparameters" (object mapping param names to definitions).
+    - Supported types: "int", "float", "categorical", "bool", "fixed".
+    - For "int"/"float": provide "low" and "high" (low < high); optionally "step" and "log".
+    - For "categorical": provide a non-empty "values" list.
+    - For "fixed": provide a "value" key.
+    - Do NOT use null or None as parameter values.
+    - Output valid JSON only — no markdown fences, no prose, no comments.
+
+    Example:
     [
-    {{
+      {
         "model_name": "RandomForestClassifier",
-        "suggested_hyperparameters": {{
-        "n_estimators": {{
-            "type": "int",
-            "low": 100,
-            "high": 300,
-            "step": 100
-        }},
-        "max_depth": {{
-            "type": "int",
-            "values": [null, 10, 20]
-        }},
-        "min_samples_split": {{
-            "type": "int",
-            "values": [2, 5]
-        }},
-        "max_features": {{
-            "type": "categorical",
-            "values": ["sqrt", "log2"]
-        }}
-        }}
-    }},
-    ...
+        "suggested_hyperparameters": {
+          "n_estimators": {"type": "int",  "low": 100, "high": 500},
+          "max_depth":    {"type": "categorical", "values": [3, 5, 7, 10]},
+          "max_features": {"type": "categorical", "values": ["sqrt", "log2"]}
+        }
+      }
     ]
-    """    
+    """
 
     @staticmethod
     def get_hyperparameter_response_prompt(hyperparameter_framework: str) -> str:
         """
-        Get the response format prompt for specified framework.
+        Return the format-instructions prompt fragment for *hyperparameter_framework*.
+
+        Delegates to ResponseSchemaRegistry so registered custom frameworks
+        are automatically supported without modifying this file.
 
         Parameters
         ----------
         hyperparameter_framework : str
-            Name of the hyperparameter optimization framework.
-            Currently supported: ["Optuna"]
+            Name of the tuning framework (e.g. ``"Optuna"``).
 
         Returns
         -------
         str
-            Template string for the specified framework.
+            The format instructions string injected as
+            ``{HyperparameterResponsePrompt}`` into the system prompt.
 
         Raises
         ------
         ValueError
-            If the specified framework is not supported.
-
-        Examples
-        --------
-        >>> prompt = HyperparameterResponsePrompt.get_hyperparameter_response_prompt("Optuna")
+            If the framework is not registered.
         """
-        if hyperparameter_framework == "Optuna":
-            return HyperparameterResponsePrompt.OptunaPrompt
-        else:
-            raise ValueError(f"Unsupported hyperparameter framework: {hyperparameter_framework}")
-        
+        # Lazy import to avoid circular dependency at module load time
+        from mltunex.ai_handler.response_schema_registry import ResponseSchemaRegistry
+        return ResponseSchemaRegistry.get(hyperparameter_framework).format_instructions()
+
 
 @dataclass
 class LLMPrompts:
     """
-    Collection of system prompts for different LLM interactions.
+    System prompts for LLM interactions.
 
-    This class provides carefully crafted system prompts for different
-    LLM-based tasks in the framework. The prompts include context setup,
-    task description, and expected output format.
-
-    Attributes
-    ----------
-    OpenAIPrompt : str
-        System prompt for OpenAI models with hyperparameter optimization focus.
+    All four placeholders are preserved exactly as in the original so the
+    existing data-flow (orchestrator -> LLMManager -> handler -> chain.invoke)
+    is unaffected.
     """
 
     OpenAIPrompt: str = """
@@ -114,12 +109,15 @@ class LLMPrompts:
     3. The hyperparameters each model supports (with data types and value hints).
 
     Your task:
-    ➡️ Suggest optimized hyperparameter **ranges** or **values** for each of the top models based on the dataset and its properties.  
-    ➡️ Use your understanding of the data (variance, correlation, distribution, skewness, etc.) to tailor the suggestions.  
-    ➡️ Only use **hyperparameters** that are suitable no need to use all of them if not required.
-    ➡️ No need to explain the hyperparameters or their significance.
-    ➡️ Provide the output in the specified format below.
-    ➡️ You should not give any parameter values as null or None. If you don't know the value, don't include it in the output.
+    - Suggest optimized hyperparameter ranges or values for each of the top models
+      based on the dataset and its properties.
+    - Use your understanding of the data (variance, correlation, distribution,
+      skewness, etc.) to tailor the suggestions.
+    - Only include hyperparameters that are meaningful for this dataset.
+      Do not include every available hyperparameter.
+    - Do not explain the hyperparameters or their significance.
+    - Do not use null or None as a parameter value.
+    - Provide the output in the format specified below.
 
     ---
 
@@ -140,6 +138,7 @@ class LLMPrompts:
     </ModelHyperparameterSchema>
 
     ---
-    ✅ **Instructions for Output**:
+
+    Instructions for Output:
     {HyperparameterResponsePrompt}
     """

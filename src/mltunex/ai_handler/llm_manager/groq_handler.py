@@ -1,58 +1,33 @@
+"""Groq concrete LLM handler — extends BaseLLMHandler."""
+from __future__ import annotations
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
-from mltunex.config.llm_config import GroqConfig
-from mltunex.ai_handler.prompt import HyperparameterResponsePrompt
-
-from json_repair import repair_json
-
+from mltunex.ai_handler.llm_handler_base import BaseLLMHandler, LLMHandlerConfig
 
 load_dotenv()
 
-class GroqHyperparamGenerator:
-    def __init__(self, hyperparameter_framework: str = "Optuna", config: GroqConfig = GroqConfig) -> None:
-        self.hyperparameter_framework = hyperparameter_framework
-        self.llm = ChatGroq(model = config.model, temperature = config.temperature)
-        self.output_parser = JsonOutputParser()
-        self.prompt_template = PromptTemplate(
-            template = config.SYSTEM_PROMPT,
-            input_variables = ["Data_Profile", "Top_Models", "ModelHyperparameter_Schema", "HyperparameterResponsePrompt"]
-        )
-        self.chain = self.prompt_template | self.llm
 
-    def generate_response(self, data_profile: str, top_models: str, model_hyperparameter_schema: str) -> str:
-        response = self.chain.invoke(
-            {"Data_Profile" : data_profile,
-            "Top_Models" : top_models,
-            "ModelHyperparameter_Schema" : model_hyperparameter_schema,
-            "HyperparameterResponsePrompt" : HyperparameterResponsePrompt.get_hyperparameter_response_prompt(self.hyperparameter_framework)}
+class GroqHyperparamGenerator(BaseLLMHandler):
+    provider_name = "Groq"
+
+    def __init__(self, config: LLMHandlerConfig, **_kw) -> None:
+        super().__init__(config)
+        self._llm = ChatGroq(model=config.model_name, temperature=config.temperature)
+        self._prompt = PromptTemplate(
+            template=config.system_prompt,
+            input_variables=["Data_Profile", "Top_Models",
+                             "ModelHyperparameter_Schema", "HyperparameterResponsePrompt"],
         )
 
-        # Format the response to ensure it is valid JSON
-        response = self.response_formatter(response = response.content) #type: ignore
-        return response
-    
-    
-    def response_formatter(self, response: str) -> str:
-        """
-        Format the response to ensure it is valid JSON.
+    # Return the full AIMessage so the base can extract token metadata
+    def _call_llm_with_obj(self, prompt_vars: dict):
+        response = (self._prompt | self._llm).invoke(prompt_vars)
+        return response.content, response  # type: ignore
 
-        Parameters
-        ----------
-        response : str
-            The raw response string from the LLM.
+    # Fallback for the abstract contract (used by subclasses that skip _with_obj)
+    def _call_llm(self, prompt_vars: dict) -> str:
+        return (self._prompt | self._llm).invoke(prompt_vars).content  # type: ignore
 
-        Returns
-        -------
-        str
-            A valid JSON string.
-        """
-        try:
-            # Attempt to parse the response as JSON
-            response = response.split("</think>")[-1]
-            response = repair_json(response)
-            response = self.output_parser.parse(response)
-            return response
-        except Exception as e:
-            raise ValueError(f"Invalid JSON response: {e}") from e
+    def generate_response(self, data_profile, top_models, schema):
+        return self.suggest_search_spaces(data_profile, top_models, schema)

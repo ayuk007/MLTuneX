@@ -140,8 +140,18 @@ class Data_Loader_Factory:
             return CSVLoader(source)
         if isinstance(source, pd.DataFrame):
             return DataFrame_Loader(source)
-        else:
-            raise ValueError(f"Unsupported data source: {source}")
+
+        # Delegate to the extensible DataSourceFactory for other formats
+        try:
+            from mltunex.data.sources import DataSourceFactory
+
+            ds = DataSourceFactory.create(source)
+            df = ds.read()
+            return DataFrame_Loader(df)
+        except ValueError:
+            pass
+
+        raise ValueError(f"Unsupported data source: {source}")
 
 
 class Data_Loader:

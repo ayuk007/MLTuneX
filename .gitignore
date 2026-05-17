@@ -44,3 +44,6 @@ htmlcov/
 # Directories
 experiments/
 test_assets/
+logs/
+models/
+results/

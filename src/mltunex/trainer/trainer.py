@@ -114,7 +114,7 @@ class ModelTrainer(BaseTrainer):
             Tuple of (model_name, trained_model).
         """
         model_name, estimator = model
-        print("Model: ", model_name)
+        # print("Model: ", model_name)
         # Configure task type for training
         task_type = self.task_type if self.task_type else ValueError("Task type must be specified for training.")
         estimator = self.library_trainer.train_model(
