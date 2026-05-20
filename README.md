@@ -157,7 +157,7 @@ preds = model.predict(pipeline.transform(X_new))
 
 ## Documentation
 
-The full documentation is hosted at **[ayuk007.github.io/mltunex-docs](https://ayuk007.github.io/mltunex-docs/)** and covers:
+The full documentation is hosted **[here](https://ayuk007.github.io/mltunex_docs/)** and covers:
 
 - [Installation & API key setup](https://ayuk007.github.io/mltunex_docs/installation.html)
 - [Quick Start walkthrough](https://ayuk007.github.io/mltunex_docs/quickstart.html)
